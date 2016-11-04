@@ -13,7 +13,11 @@ type redisStore struct {
 	conn redis.Conn
 }
 
-func NewRedisStore(conn redis.Conn) (Store, error) {
+func NewRedisStore(address string) (Store, error) {
+	conn, err := redis.Dial("tcp", address)
+	if err != nil {
+		return nil, err
+	}
 	return &redisStore{
 		conn: conn,
 	}, nil
@@ -56,6 +60,10 @@ func (s *redisStore) RemoveAll(ctx context.Context, id string) error {
 func (s *redisStore) Expire(ctx context.Context, id string, d time.Duration) error {
 	_, err := s.conn.Do("PEXPIRE", s.formatIDKey(id), int64(d/time.Millisecond))
 	return err
+}
+
+func (s *redisStore) Close() error {
+	return s.conn.Close()
 }
 
 func (s *redisStore) formatIDKey(id string) string {

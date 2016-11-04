@@ -14,4 +14,6 @@ type Store interface {
 	Remove(ctx context.Context, id, key string) error
 	RemoveAll(ctx context.Context, id string) error
 	Expire(ctx context.Context, id string, d time.Duration) error
+
+	Close() error
 }

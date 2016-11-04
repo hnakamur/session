@@ -6,20 +6,14 @@ import (
 	"time"
 
 	"bitbucket.org/hnakamur/session"
-	"github.com/garyburd/redigo/redis"
 )
 
 func main() {
-	c, err := redis.Dial("tcp", ":6379")
+	store, err := session.NewRedisStore(":6379")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
-
-	store, err := session.NewRedisStore(c)
-	if err != nil {
-		log.Fatal(err)
-	}
+	defer store.Close()
 
 	ctx := context.Background()
 	err = store.Set(ctx, "1234", "foo", "bar2")
