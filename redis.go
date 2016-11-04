@@ -120,6 +120,7 @@ func newRedisPool(address string, c *redisStoreConfig) *redis.Pool {
 		MaxIdle:     c.poolMaxIdle,
 		MaxActive:   c.poolMaxActive,
 		IdleTimeout: c.poolIdleTimeout,
+		Wait:        true,
 		Dial: func() (redis.Conn, error) {
 			conn, err := redis.Dial("tcp", address)
 			if err != nil {
