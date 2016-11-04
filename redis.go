@@ -155,6 +155,8 @@ func newRedisPool(address string, c *redisStoreConfig) *redis.Pool {
 
 func (s *redisStore) Get(ctx context.Context, id, key string, valuePtr interface{}) error {
 	conn := s.pool.Get()
+	defer conn.Close()
+
 	reply, err := conn.Do("HGET", s.formatIDKey(id), key)
 	if err != nil {
 		return err
@@ -176,11 +178,13 @@ func (s *redisStore) Get(ctx context.Context, id, key string, valuePtr interface
 }
 
 func (s *redisStore) Set(ctx context.Context, id, key string, value interface{}) error {
+	conn := s.pool.Get()
+	defer conn.Close()
+
 	v, err := s.encodeValue(value)
 	if err != nil {
 		return err
 	}
-	conn := s.pool.Get()
 	_, err = conn.Do("HSET", s.formatIDKey(id), key, v)
 	if err != nil {
 		return err
@@ -193,6 +197,8 @@ func (s *redisStore) Set(ctx context.Context, id, key string, value interface{})
 
 func (s *redisStore) Remove(ctx context.Context, id, key string) error {
 	conn := s.pool.Get()
+	defer conn.Close()
+
 	_, err := conn.Do("HDEL", s.formatIDKey(id), key)
 	if err != nil {
 		return err
@@ -205,12 +211,16 @@ func (s *redisStore) Remove(ctx context.Context, id, key string) error {
 
 func (s *redisStore) RemoveAll(ctx context.Context, id string) error {
 	conn := s.pool.Get()
+	defer conn.Close()
+
 	_, err := conn.Do("DEL", s.formatIDKey(id))
 	return err
 }
 
 func (s *redisStore) Expire(ctx context.Context, id string, d time.Duration) error {
 	conn := s.pool.Get()
+	defer conn.Close()
+
 	_, err := conn.Do("PEXPIRE", s.formatIDKey(id), int64(d/time.Millisecond))
 	return err
 }
