@@ -9,7 +9,8 @@ import (
 )
 
 func main() {
-	store, err := session.NewRedisStore(":6379")
+	store, err := session.NewRedisStore(":6379",
+		session.SetRedisPoolMaxIdle(2))
 	if err != nil {
 		log.Fatal(err)
 	}

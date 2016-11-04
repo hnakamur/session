@@ -13,34 +13,96 @@ type redisStore struct {
 	pool *redis.Pool
 }
 
-func NewRedisStore(address string) (Store, error) {
+func NewRedisStore(address string, options ...RedisStoreOption) (Store, error) {
+	c := defaultRedisStoreConfig()
+	for _, o := range options {
+		err := o(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &redisStore{
-		pool: newRedisPool(address, ""),
+		pool: newRedisPool(address, c),
 	}, nil
 }
 
-func newRedisPool(address, password string) *redis.Pool {
+type redisStoreConfig struct {
+	password               string
+	poolMaxIdle            int
+	poolMaxActive          int
+	poolIdleTimeout        time.Duration
+	poolBorrowTestDuration time.Duration
+}
+
+func defaultRedisStoreConfig() *redisStoreConfig {
+	return &redisStoreConfig{
+		poolMaxIdle:            3,
+		poolIdleTimeout:        240 * time.Second,
+		poolBorrowTestDuration: time.Minute,
+	}
+}
+
+type RedisStoreOption func(c *redisStoreConfig) error
+
+func SetRedisPassword(password string) RedisStoreOption {
+	return func(c *redisStoreConfig) error {
+		c.password = password
+		return nil
+	}
+}
+
+func SetRedisPoolMaxIdle(maxIdle int) RedisStoreOption {
+	return func(c *redisStoreConfig) error {
+		c.poolMaxIdle = maxIdle
+		return nil
+	}
+}
+
+func SetRedisPoolMaxActive(maxActive int) RedisStoreOption {
+	return func(c *redisStoreConfig) error {
+		c.poolMaxActive = maxActive
+		return nil
+	}
+}
+
+func SetRedisPoolIdleTimeout(idleTimeout time.Duration) RedisStoreOption {
+	return func(c *redisStoreConfig) error {
+		c.poolIdleTimeout = idleTimeout
+		return nil
+	}
+}
+
+func SetRedisBorrowPoolTestDuration(duration time.Duration) RedisStoreOption {
+	return func(c *redisStoreConfig) error {
+		c.poolBorrowTestDuration = duration
+		return nil
+	}
+}
+
+func newRedisPool(address string, c *redisStoreConfig) *redis.Pool {
 	return &redis.Pool{
-		MaxIdle:     3,
-		IdleTimeout: 240 * time.Second,
+		MaxIdle:     c.poolMaxIdle,
+		MaxActive:   c.poolMaxActive,
+		IdleTimeout: c.poolIdleTimeout,
 		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", address)
+			conn, err := redis.Dial("tcp", address)
 			if err != nil {
 				return nil, err
 			}
-			if password != "" {
-				if _, err := c.Do("AUTH", password); err != nil {
-					c.Close()
+			if c.password != "" {
+				if _, err := conn.Do("AUTH", c.password); err != nil {
+					conn.Close()
 					return nil, err
 				}
 			}
-			return c, err
+			return conn, err
 		},
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			if time.Since(t) < time.Minute {
+		TestOnBorrow: func(conn redis.Conn, t time.Time) error {
+			if time.Since(t) < c.poolBorrowTestDuration {
 				return nil
 			}
-			_, err := c.Do("PING")
+			_, err := conn.Do("PING")
 			return err
 		},
 	}
