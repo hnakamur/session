@@ -10,7 +10,8 @@ import (
 
 func main() {
 	store, err := session.NewRedisStore(":6379",
-		session.SetRedisPoolMaxIdle(2))
+		session.SetRedisPoolMaxIdle(2),
+		session.SetAutoExpire(time.Second))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -18,11 +19,6 @@ func main() {
 
 	ctx := context.Background()
 	err = store.Set(ctx, "1234", "foo", "bar2")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = store.Expire(ctx, "1234", time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -3,7 +3,6 @@ package session
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -11,6 +10,7 @@ import (
 
 type redisStore struct {
 	pool        *redis.Pool
+	autoExpire  time.Duration
 	formatIDKey func(id string) string
 	encodeValue func(value interface{}) ([]byte, error)
 	decodeValue func(data []byte, valuePtr interface{}) error
@@ -27,6 +27,7 @@ func NewRedisStore(address string, options ...RedisStoreOption) (Store, error) {
 
 	return &redisStore{
 		pool:        newRedisPool(address, c),
+		autoExpire:  c.autoExpire,
 		formatIDKey: c.formatIDKey,
 		encodeValue: c.encodeValue,
 		decodeValue: c.decodeValue,
@@ -39,6 +40,7 @@ type redisStoreConfig struct {
 	poolMaxActive          int
 	poolIdleTimeout        time.Duration
 	poolBorrowTestDuration time.Duration
+	autoExpire             time.Duration
 	formatIDKey            func(id string) string
 	encodeValue            func(value interface{}) ([]byte, error)
 	decodeValue            func(data []byte, valuePtr interface{}) error
@@ -90,6 +92,13 @@ func SetRedisPoolIdleTimeout(idleTimeout time.Duration) RedisStoreOption {
 func SetRedisBorrowPoolTestDuration(duration time.Duration) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
 		c.poolBorrowTestDuration = duration
+		return nil
+	}
+}
+
+func SetAutoExpire(autoExpire time.Duration) RedisStoreOption {
+	return func(c *redisStoreConfig) error {
+		c.autoExpire = autoExpire
 		return nil
 	}
 }
@@ -156,7 +165,14 @@ func (s *redisStore) Get(ctx context.Context, id, key string, valuePtr interface
 	if valuePtr == nil {
 		return nil
 	}
-	return s.decodeValue(reply.([]byte), valuePtr)
+	err = s.decodeValue(reply.([]byte), valuePtr)
+	if err != nil {
+		return err
+	}
+	if s.autoExpire > 0 {
+		return s.Expire(ctx, id, s.autoExpire)
+	}
+	return nil
 }
 
 func (s *redisStore) Set(ctx context.Context, id, key string, value interface{}) error {
@@ -166,14 +182,25 @@ func (s *redisStore) Set(ctx context.Context, id, key string, value interface{})
 	}
 	conn := s.pool.Get()
 	_, err = conn.Do("HSET", s.formatIDKey(id), key, v)
-	log.Printf("Set. id=%s, key=%s, err=%+v", id, key, err)
-	return err
+	if err != nil {
+		return err
+	}
+	if s.autoExpire > 0 {
+		return s.Expire(ctx, id, s.autoExpire)
+	}
+	return nil
 }
 
 func (s *redisStore) Remove(ctx context.Context, id, key string) error {
 	conn := s.pool.Get()
 	_, err := conn.Do("HDEL", s.formatIDKey(id), key)
-	return err
+	if err != nil {
+		return err
+	}
+	if s.autoExpire > 0 {
+		return s.Expire(ctx, id, s.autoExpire)
+	}
+	return nil
 }
 
 func (s *redisStore) RemoveAll(ctx context.Context, id string) error {
