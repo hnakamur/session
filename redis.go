@@ -10,7 +10,10 @@ import (
 )
 
 type redisStore struct {
-	pool *redis.Pool
+	pool        *redis.Pool
+	formatIDKey func(id string) string
+	encodeValue func(value interface{}) ([]byte, error)
+	decodeValue func(data []byte, valuePtr interface{}) error
 }
 
 func NewRedisStore(address string, options ...RedisStoreOption) (Store, error) {
@@ -23,7 +26,10 @@ func NewRedisStore(address string, options ...RedisStoreOption) (Store, error) {
 	}
 
 	return &redisStore{
-		pool: newRedisPool(address, c),
+		pool:        newRedisPool(address, c),
+		formatIDKey: c.formatIDKey,
+		encodeValue: c.encodeValue,
+		decodeValue: c.decodeValue,
 	}, nil
 }
 
@@ -33,6 +39,9 @@ type redisStoreConfig struct {
 	poolMaxActive          int
 	poolIdleTimeout        time.Duration
 	poolBorrowTestDuration time.Duration
+	formatIDKey            func(id string) string
+	encodeValue            func(value interface{}) ([]byte, error)
+	decodeValue            func(data []byte, valuePtr interface{}) error
 }
 
 func defaultRedisStoreConfig() *redisStoreConfig {
@@ -40,6 +49,11 @@ func defaultRedisStoreConfig() *redisStoreConfig {
 		poolMaxIdle:            3,
 		poolIdleTimeout:        240 * time.Second,
 		poolBorrowTestDuration: time.Minute,
+		formatIDKey: func(id string) string {
+			return "sess:" + id
+		},
+		encodeValue: json.Marshal,
+		decodeValue: json.Unmarshal,
 	}
 }
 
@@ -76,6 +90,27 @@ func SetRedisPoolIdleTimeout(idleTimeout time.Duration) RedisStoreOption {
 func SetRedisBorrowPoolTestDuration(duration time.Duration) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
 		c.poolBorrowTestDuration = duration
+		return nil
+	}
+}
+
+func SetFormatIDKey(formatIDKey func(id string) string) RedisStoreOption {
+	return func(c *redisStoreConfig) error {
+		c.formatIDKey = formatIDKey
+		return nil
+	}
+}
+
+func SetEncodeValue(encodeValue func(value interface{}) ([]byte, error)) RedisStoreOption {
+	return func(c *redisStoreConfig) error {
+		c.encodeValue = encodeValue
+		return nil
+	}
+}
+
+func SetDecodeValue(decodeValue func(data []byte, valuePtr interface{}) error) RedisStoreOption {
+	return func(c *redisStoreConfig) error {
+		c.decodeValue = decodeValue
 		return nil
 	}
 }
@@ -154,16 +189,4 @@ func (s *redisStore) Expire(ctx context.Context, id string, d time.Duration) err
 
 func (s *redisStore) Close() error {
 	return s.pool.Close()
-}
-
-func (s *redisStore) formatIDKey(id string) string {
-	return "sess:" + id
-}
-
-func (s *redisStore) encodeValue(value interface{}) ([]byte, error) {
-	return json.Marshal(value)
-}
-
-func (s *redisStore) decodeValue(data []byte, valuePtr interface{}) error {
-	return json.Unmarshal(data, valuePtr)
 }
