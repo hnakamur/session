@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,6 +10,7 @@ import (
 	"bitbucket.org/hnakamur/session"
 )
 
+var sessionIDManager session.IDManager
 var sessionStore *session.RedisStore
 
 type mySession struct {
@@ -21,27 +20,12 @@ type mySession struct {
 const sessionIDKey = "SessionID"
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
-	c, err := r.Cookie(sessionIDKey)
-	log.Printf("c=%+v, err=%+v", c, err)
-	if err != nil && err != http.ErrNoCookie {
+	sessID, err := sessionIDManager.GetOrIssue(w, r)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err == http.ErrNoCookie {
-		sid, err := issueSessionID()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		c = &http.Cookie{
-			Name:  sessionIDKey,
-			Value: sid,
-		}
-		http.SetCookie(w, c)
-	}
-
-	sessID := c.Value
 	sess := mySession{}
 	err = sessionStore.Load(context.Background(), sessID, &sess)
 	log.Printf("after Load. sess=%+v, err=%+v", sess, err)
@@ -50,9 +34,7 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err == nil {
-		sess.Counter++
-	}
+	sess.Counter++
 
 	err = sessionStore.Save(context.Background(), sessID, sess)
 	if err != nil {
@@ -65,6 +47,8 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	var err error
+	sessionIDManager, err = session.NewIDCookieManager(
+		session.SetSessionIDKey(sessionIDKey))
 	sessionStore, err = session.NewRedisStore(":6379",
 		session.SetRedisPoolMaxIdle(2),
 		session.SetAutoExpire(time.Minute))
@@ -75,13 +59,4 @@ func main() {
 
 	http.HandleFunc("/view/", viewHandler)
 	http.ListenAndServe(":8080", nil)
-}
-
-func issueSessionID() (string, error) {
-	buf := make([]byte, 16)
-	_, err := rand.Read(buf)
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
