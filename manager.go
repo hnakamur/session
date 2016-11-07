@@ -34,3 +34,11 @@ func (m *Manager) LoadOrNew(ctx context.Context, w http.ResponseWriter, r *http.
 func (m *Manager) Save(ctx context.Context, w http.ResponseWriter, r *http.Request, sessID string, sessionData interface{}) error {
 	return m.store.Save(ctx, sessID, sessionData)
 }
+
+func (m *Manager) Delete(ctx context.Context, w http.ResponseWriter, r *http.Request, sessID string) error {
+	err := m.idManager.Delete(w, r)
+	if err != nil {
+		return err
+	}
+	return m.store.Delete(ctx, sessID)
+}

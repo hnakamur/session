@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
+	"time"
 )
 
 type IDCookieManager struct {
@@ -48,6 +49,16 @@ func (m *IDCookieManager) GetOrIssue(w http.ResponseWriter, r *http.Request) (st
 		http.SetCookie(w, c)
 	}
 	return c.Value, nil
+}
+
+func (m *IDCookieManager) Delete(w http.ResponseWriter, r *http.Request) error {
+	c := &http.Cookie{
+		Name:    m.sessionIDKey,
+		Value:   "",
+		Expires: time.Time{},
+	}
+	http.SetCookie(w, c)
+	return nil
 }
 
 func (m *IDCookieManager) issueSessionID() (string, error) {
