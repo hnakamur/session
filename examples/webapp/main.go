@@ -38,15 +38,35 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hello, counter=%d\n", sess.Counter)
 }
 
+func signOutHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	sess := mySession{}
+	sessID, _, err := sessionManager.LoadOrNew(ctx, w, r, &sess)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = sessionManager.Delete(ctx, w, r, sessID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintln(w, "Deleted sesion")
+}
+
 func main() {
+	sessionMaxAge := time.Minute
 	sessionIDManager, err := session.NewIDCookieManager(
-		session.SetSessionIDKey(sessionIDKey))
+		session.SetSessionIDKey(sessionIDKey),
+		session.SetMaxAge(sessionMaxAge))
 	if err != nil {
 		log.Fatal(err)
 	}
 	sessionStore, err := session.NewRedisStore(":6379",
 		session.SetRedisPoolMaxIdle(2),
-		session.SetAutoExpire(time.Minute))
+		session.SetAutoExpire(sessionMaxAge))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -54,5 +74,6 @@ func main() {
 	sessionManager = session.NewManager(sessionIDManager, sessionStore)
 
 	http.HandleFunc("/view/", viewHandler)
+	http.HandleFunc("/sign-out/", signOutHandler)
 	http.ListenAndServe(":8080", nil)
 }
