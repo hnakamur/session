@@ -10,8 +10,7 @@ import (
 	"bitbucket.org/hnakamur/session"
 )
 
-var sessionIDManager session.IDManager
-var sessionStore *session.RedisStore
+var sessionManager *session.Manager
 
 type mySession struct {
 	Counter int `json:"counter"`
@@ -20,23 +19,17 @@ type mySession struct {
 const sessionIDKey = "SessionID"
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
-	sessID, err := sessionIDManager.GetOrIssue(w, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
+	ctx := context.Background()
 	sess := mySession{}
-	err = sessionStore.Load(context.Background(), sessID, &sess)
-	log.Printf("after Load. sess=%+v, err=%+v", sess, err)
-	if err != nil && err != session.ErrNotFound {
+	sessID, _, err := sessionManager.LoadOrNew(ctx, w, r, &sess)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	sess.Counter++
 
-	err = sessionStore.Save(context.Background(), sessID, sess)
+	err = sessionManager.Save(ctx, w, r, sessID, sess)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -46,16 +39,19 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	var err error
-	sessionIDManager, err = session.NewIDCookieManager(
+	sessionIDManager, err := session.NewIDCookieManager(
 		session.SetSessionIDKey(sessionIDKey))
-	sessionStore, err = session.NewRedisStore(":6379",
+	if err != nil {
+		log.Fatal(err)
+	}
+	sessionStore, err := session.NewRedisStore(":6379",
 		session.SetRedisPoolMaxIdle(2),
 		session.SetAutoExpire(time.Minute))
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer sessionStore.Close()
+	sessionManager = session.NewManager(sessionIDManager, sessionStore)
 
 	http.HandleFunc("/view/", viewHandler)
 	http.ListenAndServe(":8080", nil)
