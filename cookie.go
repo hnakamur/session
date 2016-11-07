@@ -9,6 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// IDCookieManager is a session ID manager that uses cookie to send or receive
+// a session ID with a HTTP client.
 type IDCookieManager struct {
 	idByteLen    int
 	idEncoder    func(data []byte) string
@@ -20,6 +22,7 @@ type IDCookieManager struct {
 	httpOnly     bool
 }
 
+// NewIDCookieManager creates a new IDCookieManager.
 func NewIDCookieManager(options ...IDCookieManagerOption) (*IDCookieManager, error) {
 	m := &IDCookieManager{
 		idByteLen: 16,
@@ -34,8 +37,10 @@ func NewIDCookieManager(options ...IDCookieManagerOption) (*IDCookieManager, err
 	return m, nil
 }
 
+// IDCookieManagerOption is the type for option of IDCookieManager.
 type IDCookieManagerOption func(m *IDCookieManager) error
 
+// SetIDByteLen sets the session ID byte length.
 func SetIDByteLen(idByteLen int) IDCookieManagerOption {
 	return func(m *IDCookieManager) error {
 		m.idByteLen = idByteLen
@@ -43,6 +48,7 @@ func SetIDByteLen(idByteLen int) IDCookieManagerOption {
 	}
 }
 
+// SetIDEncoder sets the session ID encoder.
 func SetIDEncoder(idEncoder func(data []byte) string) IDCookieManagerOption {
 	return func(m *IDCookieManager) error {
 		m.idEncoder = idEncoder
@@ -50,6 +56,7 @@ func SetIDEncoder(idEncoder func(data []byte) string) IDCookieManagerOption {
 	}
 }
 
+// SetSessionIDKey sets the session ID key in a cookie.
 func SetSessionIDKey(sessionIDKey string) IDCookieManagerOption {
 	return func(m *IDCookieManager) error {
 		m.sessionIDKey = sessionIDKey
@@ -57,6 +64,7 @@ func SetSessionIDKey(sessionIDKey string) IDCookieManagerOption {
 	}
 }
 
+// SetPath sets the cookie path.
 func SetPath(path string) IDCookieManagerOption {
 	return func(m *IDCookieManager) error {
 		m.path = path
@@ -64,6 +72,7 @@ func SetPath(path string) IDCookieManagerOption {
 	}
 }
 
+// SetDomain sets the cookie domain.
 func SetDomain(domain string) IDCookieManagerOption {
 	return func(m *IDCookieManager) error {
 		m.domain = domain
@@ -71,6 +80,8 @@ func SetDomain(domain string) IDCookieManagerOption {
 	}
 }
 
+// SetMaxAge sets the Max-Age in the cookie.
+// The precision of the duration is one second and the sub-second part will be ignored.
 func SetMaxAge(duration time.Duration) IDCookieManagerOption {
 	return func(m *IDCookieManager) error {
 		m.maxAge = int(duration / time.Second)
@@ -78,6 +89,7 @@ func SetMaxAge(duration time.Duration) IDCookieManagerOption {
 	}
 }
 
+// SetSecure sets the Secure in the cookie.
 func SetSecure(secure bool) IDCookieManagerOption {
 	return func(m *IDCookieManager) error {
 		m.secure = secure
@@ -85,13 +97,18 @@ func SetSecure(secure bool) IDCookieManagerOption {
 	}
 }
 
-func SetHTTPOnly(httpOnly bool) IDCookieManagerOption {
+// SethTTPOnly sets the HttpOnly in the cookie.
+func SethTTPOnly(httpOnly bool) IDCookieManagerOption {
 	return func(m *IDCookieManager) error {
 		m.httpOnly = httpOnly
 		return nil
 	}
 }
 
+// Get gets the session ID from the request.
+// To check if the session ID was not specified in the request,
+// use errors.Cause(err) == session.ErrNotFound
+// where errors is github.com/pkg/errors.
 func (m *IDCookieManager) Get(r *http.Request) (string, error) {
 	c, err := r.Cookie(m.sessionIDKey)
 	if err == http.ErrNoCookie {
@@ -103,6 +120,7 @@ func (m *IDCookieManager) Get(r *http.Request) (string, error) {
 	return c.Value, nil
 }
 
+// Issue issues a new session ID.
 func (m *IDCookieManager) Issue() (string, error) {
 	buf := make([]byte, m.idByteLen)
 	_, err := rand.Read(buf)
@@ -112,6 +130,7 @@ func (m *IDCookieManager) Issue() (string, error) {
 	return m.idEncoder(buf), nil
 }
 
+// Write writes a session ID to the request response.
 func (m *IDCookieManager) Write(w http.ResponseWriter, sessID string) error {
 	c := &http.Cookie{
 		Name:     m.sessionIDKey,
@@ -126,6 +145,7 @@ func (m *IDCookieManager) Write(w http.ResponseWriter, sessID string) error {
 	return nil
 }
 
+// Delete adds a response header which tells the HTTP client to delete the session ID..
 func (m *IDCookieManager) Delete(w http.ResponseWriter) error {
 	c := &http.Cookie{
 		Name:   m.sessionIDKey,

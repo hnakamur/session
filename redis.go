@@ -9,6 +9,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// RedisStore is a session data store which uses Redis as a backend.
+// It uses a connection pool and you can use one RedisStore concurrently
+// from multiple goroutines at the same time.
 type RedisStore struct {
 	pool        *redis.Pool
 	expiration  time.Duration
@@ -17,6 +20,7 @@ type RedisStore struct {
 	decodeValue func(data []byte, valuePtr interface{}) error
 }
 
+// NewRedisStore creates a RedisStore.
 func NewRedisStore(address string, options ...RedisStoreOption) (*RedisStore, error) {
 	c := defaultRedisStoreConfig()
 	for _, o := range options {
@@ -61,8 +65,10 @@ func defaultRedisStoreConfig() *redisStoreConfig {
 	}
 }
 
+// RedisStoreOption is the option type for NewRedisStore.
 type RedisStoreOption func(c *redisStoreConfig) error
 
+// SetRedisPassword sets the password for the redis server.
 func SetRedisPassword(password string) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
 		c.password = password
@@ -70,6 +76,7 @@ func SetRedisPassword(password string) RedisStoreOption {
 	}
 }
 
+// SetRedisPoolMaxIdle sets the max idle worker count in the redis connection pool.
 func SetRedisPoolMaxIdle(maxIdle int) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
 		c.poolMaxIdle = maxIdle
@@ -77,6 +84,7 @@ func SetRedisPoolMaxIdle(maxIdle int) RedisStoreOption {
 	}
 }
 
+// SetRedisPoolMaxActive sets the max active worker count in the redis connection pool.
 func SetRedisPoolMaxActive(maxActive int) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
 		c.poolMaxActive = maxActive
@@ -84,6 +92,7 @@ func SetRedisPoolMaxActive(maxActive int) RedisStoreOption {
 	}
 }
 
+// SetRedisPoolIdleTimeout sets the max idle timeout for the redis connection pool.
 func SetRedisPoolIdleTimeout(idleTimeout time.Duration) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
 		c.poolIdleTimeout = idleTimeout
@@ -91,6 +100,7 @@ func SetRedisPoolIdleTimeout(idleTimeout time.Duration) RedisStoreOption {
 	}
 }
 
+// SetRedisBorrowPoolTestDuration sets the test duration for the redis connection pool.
 func SetRedisBorrowPoolTestDuration(duration time.Duration) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
 		c.poolBorrowTestDuration = duration
@@ -98,6 +108,8 @@ func SetRedisBorrowPoolTestDuration(duration time.Duration) RedisStoreOption {
 	}
 }
 
+// SetExpiration sets the expiration duration for session data.
+// The precision is one second and the sub-second part is ignored.
 func SetExpiration(expiration time.Duration) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
 		c.expiration = expiration
@@ -105,6 +117,7 @@ func SetExpiration(expiration time.Duration) RedisStoreOption {
 	}
 }
 
+// SetFormatIDKey sets a function to format the session key for a session ID.
 func SetFormatIDKey(formatIDKey func(id string) string) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
 		c.formatIDKey = formatIDKey
@@ -112,6 +125,7 @@ func SetFormatIDKey(formatIDKey func(id string) string) RedisStoreOption {
 	}
 }
 
+// SetEncodeValue sets a function to encode a session data.
 func SetEncodeValue(encodeValue func(value interface{}) ([]byte, error)) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
 		c.encodeValue = encodeValue
@@ -119,6 +133,7 @@ func SetEncodeValue(encodeValue func(value interface{}) ([]byte, error)) RedisSt
 	}
 }
 
+// SetDecodeValue sets a function to decode a session data.
 func SetDecodeValue(decodeValue func(data []byte, valuePtr interface{}) error) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
 		c.decodeValue = decodeValue
@@ -157,6 +172,8 @@ func newRedisPool(address string, c *redisStoreConfig) *redis.Pool {
 	}
 }
 
+// Load loads a session data from the store.
+// The first argument ctx is not used and ignored in the current implementation.
 func (s *RedisStore) Load(ctx context.Context, id string, valuePtr interface{}) error {
 	conn := s.pool.Get()
 	defer conn.Close()
@@ -175,6 +192,8 @@ func (s *RedisStore) Load(ctx context.Context, id string, valuePtr interface{}) 
 	return nil
 }
 
+// Save saves a session data to the store.
+// The first argument ctx is not used and ignored in the current implementation.
 func (s *RedisStore) Save(ctx context.Context, id string, value interface{}) error {
 	conn := s.pool.Get()
 	defer conn.Close()
@@ -191,6 +210,8 @@ func (s *RedisStore) Save(ctx context.Context, id string, value interface{}) err
 	return nil
 }
 
+// Delete deletes a session data from the store.
+// The first argument ctx is not used and ignored in the current implementation.
 func (s *RedisStore) Delete(ctx context.Context, id string) error {
 	conn := s.pool.Get()
 	defer conn.Close()
@@ -202,6 +223,7 @@ func (s *RedisStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// Close shutdowns the connection pool to the redis server.
 func (s *RedisStore) Close() error {
 	return s.pool.Close()
 }
