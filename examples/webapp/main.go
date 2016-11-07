@@ -31,6 +31,7 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = sessionManager.Save(ctx, w, r, sessID, sess)
 	if err != nil {
+		log.Printf("after sessionManager.Save. err=%+v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -66,7 +67,7 @@ func main() {
 	}
 	sessionStore, err := session.NewRedisStore(":6379",
 		session.SetRedisPoolMaxIdle(2),
-		session.SetAutoExpire(sessionMaxAge))
+		session.SetExpiration(sessionMaxAge))
 	if err != nil {
 		log.Fatal(err)
 	}

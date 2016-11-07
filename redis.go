@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/pkg/errors"
 )
 
 type RedisStore struct {
 	pool        *redis.Pool
-	autoExpire  time.Duration
+	expiration  time.Duration
 	formatIDKey func(id string) string
 	encodeValue func(value interface{}) ([]byte, error)
 	decodeValue func(data []byte, valuePtr interface{}) error
@@ -27,7 +28,7 @@ func NewRedisStore(address string, options ...RedisStoreOption) (*RedisStore, er
 
 	return &RedisStore{
 		pool:        newRedisPool(address, c),
-		autoExpire:  c.autoExpire,
+		expiration:  c.expiration,
 		formatIDKey: c.formatIDKey,
 		encodeValue: c.encodeValue,
 		decodeValue: c.decodeValue,
@@ -40,7 +41,7 @@ type redisStoreConfig struct {
 	poolMaxActive          int
 	poolIdleTimeout        time.Duration
 	poolBorrowTestDuration time.Duration
-	autoExpire             time.Duration
+	expiration             time.Duration
 	formatIDKey            func(id string) string
 	encodeValue            func(value interface{}) ([]byte, error)
 	decodeValue            func(data []byte, valuePtr interface{}) error
@@ -51,6 +52,7 @@ func defaultRedisStoreConfig() *redisStoreConfig {
 		poolMaxIdle:            3,
 		poolIdleTimeout:        240 * time.Second,
 		poolBorrowTestDuration: time.Minute,
+		expiration:             5 * time.Minute,
 		formatIDKey: func(id string) string {
 			return "sess:" + id
 		},
@@ -96,9 +98,9 @@ func SetRedisBorrowPoolTestDuration(duration time.Duration) RedisStoreOption {
 	}
 }
 
-func SetAutoExpire(autoExpire time.Duration) RedisStoreOption {
+func SetExpiration(expiration time.Duration) RedisStoreOption {
 	return func(c *redisStoreConfig) error {
-		c.autoExpire = autoExpire
+		c.expiration = expiration
 		return nil
 	}
 }
@@ -164,14 +166,7 @@ func (s *RedisStore) Load(ctx context.Context, id string, valuePtr interface{}) 
 	if reply == nil {
 		return ErrNotFound
 	}
-	err = s.decodeValue(reply.([]byte), valuePtr)
-	if err != nil {
-		return err
-	}
-	if s.autoExpire > 0 {
-		return s.Expire(ctx, id, s.autoExpire)
-	}
-	return nil
+	return s.decodeValue(reply.([]byte), valuePtr)
 }
 
 func (s *RedisStore) Save(ctx context.Context, id string, value interface{}) error {
@@ -182,14 +177,12 @@ func (s *RedisStore) Save(ctx context.Context, id string, value interface{}) err
 	if err != nil {
 		return err
 	}
-	_, err = conn.Do("SET", s.formatIDKey(id), v)
+	seconds := int64(s.expiration / time.Second)
+	_, err = conn.Do("SETEX", s.formatIDKey(id), seconds, v)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
-	if s.autoExpire > 0 {
-		return s.Expire(ctx, id, s.autoExpire)
-	}
-	return nil
+	return err
 }
 
 func (s *RedisStore) Delete(ctx context.Context, id string) error {
@@ -197,14 +190,6 @@ func (s *RedisStore) Delete(ctx context.Context, id string) error {
 	defer conn.Close()
 
 	_, err := conn.Do("DEL", s.formatIDKey(id))
-	return err
-}
-
-func (s *RedisStore) Expire(ctx context.Context, id string, d time.Duration) error {
-	conn := s.pool.Get()
-	defer conn.Close()
-
-	_, err := conn.Do("PEXPIRE", s.formatIDKey(id), int64(d/time.Millisecond))
 	return err
 }
 
