@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"bitbucket.org/hnakamur/session"
+	"github.com/hnakamur/session"
 )
 
 type mySession struct {

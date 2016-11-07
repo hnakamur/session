@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"bitbucket.org/hnakamur/session"
+	"github.com/hnakamur/session"
 )
 
 var sessionManager *session.Manager
