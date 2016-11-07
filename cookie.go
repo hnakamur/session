@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type IDCookieManager struct {
@@ -26,7 +28,7 @@ func NewIDCookieManager(options ...IDCookieManagerOption) (*IDCookieManager, err
 	for _, opt := range options {
 		err := opt(m)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 	}
 	return m, nil
@@ -93,9 +95,9 @@ func SetHTTPOnly(httpOnly bool) IDCookieManagerOption {
 func (m *IDCookieManager) Get(r *http.Request) (string, error) {
 	c, err := r.Cookie(m.sessionIDKey)
 	if err == http.ErrNoCookie {
-		return "", ErrNotFound
+		return "", errors.WithStack(ErrNotFound)
 	} else if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return c.Value, nil
@@ -105,7 +107,7 @@ func (m *IDCookieManager) Issue() (string, error) {
 	buf := make([]byte, m.idByteLen)
 	_, err := rand.Read(buf)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	return m.idEncoder(buf), nil
 }

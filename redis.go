@@ -22,7 +22,7 @@ func NewRedisStore(address string, options ...RedisStoreOption) (*RedisStore, er
 	for _, o := range options {
 		err := o(c)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 	}
 
@@ -135,22 +135,24 @@ func newRedisPool(address string, c *redisStoreConfig) *redis.Pool {
 		Dial: func() (redis.Conn, error) {
 			conn, err := redis.Dial("tcp", address)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			if c.password != "" {
 				if _, err := conn.Do("AUTH", c.password); err != nil {
 					conn.Close()
-					return nil, err
+					return nil, errors.WithStack(err)
 				}
 			}
-			return conn, err
+			return conn, nil
 		},
 		TestOnBorrow: func(conn redis.Conn, t time.Time) error {
 			if time.Since(t) < c.poolBorrowTestDuration {
 				return nil
 			}
 			_, err := conn.Do("PING")
-			return err
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		},
 	}
 }
@@ -161,12 +163,16 @@ func (s *RedisStore) Load(ctx context.Context, id string, valuePtr interface{}) 
 
 	reply, err := conn.Do("GET", s.formatIDKey(id))
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	if reply == nil {
-		return ErrNotFound
+		return errors.WithStack(ErrNotFound)
 	}
-	return s.decodeValue(reply.([]byte), valuePtr)
+	err = s.decodeValue(reply.([]byte), valuePtr)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
 }
 
 func (s *RedisStore) Save(ctx context.Context, id string, value interface{}) error {
@@ -175,14 +181,14 @@ func (s *RedisStore) Save(ctx context.Context, id string, value interface{}) err
 
 	v, err := s.encodeValue(value)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	seconds := int64(s.expiration / time.Second)
 	_, err = conn.Do("SETEX", s.formatIDKey(id), seconds, v)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	return err
+	return nil
 }
 
 func (s *RedisStore) Delete(ctx context.Context, id string) error {
@@ -190,7 +196,10 @@ func (s *RedisStore) Delete(ctx context.Context, id string) error {
 	defer conn.Close()
 
 	_, err := conn.Do("DEL", s.formatIDKey(id))
-	return err
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
 }
 
 func (s *RedisStore) Close() error {

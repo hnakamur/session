@@ -3,6 +3,8 @@ package session
 import (
 	"context"
 	"net/http"
+
+	"github.com/pkg/errors"
 )
 
 // Manager is a session manager.
@@ -34,7 +36,7 @@ func NewManager(idManager IDManager, store Store) *Manager {
 // since you need to update the expiration time of the session ID and the session data.
 func (m *Manager) LoadOrNew(ctx context.Context, w http.ResponseWriter, r *http.Request, sessionDataPtr interface{}) (sessID string, found bool, err error) {
 	sessID, err = m.idManager.Get(r)
-	if err == ErrNotFound {
+	if errors.Cause(err) == ErrNotFound {
 		sessID, err = m.idManager.Issue()
 		return sessID, false, err
 	} else if err != nil {
@@ -42,7 +44,7 @@ func (m *Manager) LoadOrNew(ctx context.Context, w http.ResponseWriter, r *http.
 	}
 
 	err = m.store.Load(ctx, sessID, sessionDataPtr)
-	if err == ErrNotFound {
+	if errors.Cause(err) == ErrNotFound {
 		// NOTE: A malicious user may have set an arbitrary session ID, so issue a new session ID here.
 		sessID, err = m.idManager.Issue()
 		return sessID, false, err
