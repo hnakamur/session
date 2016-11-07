@@ -8,6 +8,10 @@ import (
 	"bitbucket.org/hnakamur/session"
 )
 
+type mySession struct {
+	Foo string `json:"foo"`
+}
+
 func main() {
 	store, err := session.NewRedisStore(":6379",
 		session.SetRedisPoolMaxIdle(2),
@@ -17,23 +21,26 @@ func main() {
 	}
 	defer store.Close()
 
+	session := mySession{Foo: "bar"}
+
 	ctx := context.Background()
-	err = store.Set(ctx, "1234", "foo", "bar2")
+	err = store.Save(ctx, "1234", session)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var v interface{}
-	err = store.Get(ctx, "1234", "foo", &v)
+	session2 := mySession{}
+	err = store.Load(ctx, "1234", &session2)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("v=%+v", v)
+	log.Printf("session2=%+v", session2)
 
 	time.Sleep(2 * time.Second)
-	err = store.Get(ctx, "1234", "foo", &v)
+	session3 := mySession{}
+	err = store.Load(ctx, "1234", &session3)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("v=%+v", v)
+	log.Printf("session3=%+v", session3)
 }
