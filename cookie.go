@@ -8,6 +8,8 @@ import (
 )
 
 type IDCookieManager struct {
+	idByteLen    int
+	idEncoder    func(data []byte) string
 	sessionIDKey string
 	path         string
 	domain       string
@@ -17,7 +19,10 @@ type IDCookieManager struct {
 }
 
 func NewIDCookieManager(options ...IDCookieManagerOption) (*IDCookieManager, error) {
-	m := new(IDCookieManager)
+	m := &IDCookieManager{
+		idByteLen: 16,
+		idEncoder: base64.RawURLEncoding.EncodeToString,
+	}
 	for _, opt := range options {
 		err := opt(m)
 		if err != nil {
@@ -28,6 +33,20 @@ func NewIDCookieManager(options ...IDCookieManagerOption) (*IDCookieManager, err
 }
 
 type IDCookieManagerOption func(m *IDCookieManager) error
+
+func SetIDByteLen(idByteLen int) IDCookieManagerOption {
+	return func(m *IDCookieManager) error {
+		m.idByteLen = idByteLen
+		return nil
+	}
+}
+
+func SetIDEncoder(idEncoder func(data []byte) string) IDCookieManagerOption {
+	return func(m *IDCookieManager) error {
+		m.idEncoder = idEncoder
+		return nil
+	}
+}
 
 func SetSessionIDKey(sessionIDKey string) IDCookieManagerOption {
 	return func(m *IDCookieManager) error {
@@ -83,12 +102,12 @@ func (m *IDCookieManager) Get(r *http.Request) (string, error) {
 }
 
 func (m *IDCookieManager) Issue() (string, error) {
-	buf := make([]byte, 16)
+	buf := make([]byte, m.idByteLen)
 	_, err := rand.Read(buf)
 	if err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
+	return m.idEncoder(buf), nil
 }
 
 func (m *IDCookieManager) Write(w http.ResponseWriter, sessID string) error {
