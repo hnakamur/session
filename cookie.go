@@ -71,23 +71,28 @@ func SetHTTPOnly(httpOnly bool) IDCookieManagerOption {
 	}
 }
 
-func (m *IDCookieManager) GetOrIssue(w http.ResponseWriter, r *http.Request) (string, error) {
+func (m *IDCookieManager) Get(r *http.Request) (string, error) {
 	c, err := r.Cookie(m.sessionIDKey)
-	if err != nil && err != http.ErrNoCookie {
+	if err == http.ErrNoCookie {
+		return "", ErrNotFound
+	} else if err != nil {
 		return "", err
 	}
 
-	var sessID string
-	if err == nil {
-		sessID = c.Value
-	} else {
-		sessID, err = m.issueSessionID()
-		if err != nil {
-			return "", err
-		}
-	}
+	return c.Value, nil
+}
 
-	c = &http.Cookie{
+func (m *IDCookieManager) Issue() (string, error) {
+	buf := make([]byte, 16)
+	_, err := rand.Read(buf)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+func (m *IDCookieManager) Write(w http.ResponseWriter, sessID string) error {
+	c := &http.Cookie{
 		Name:     m.sessionIDKey,
 		Value:    sessID,
 		Path:     m.path,
@@ -97,10 +102,10 @@ func (m *IDCookieManager) GetOrIssue(w http.ResponseWriter, r *http.Request) (st
 		HttpOnly: m.httpOnly,
 	}
 	http.SetCookie(w, c)
-	return sessID, nil
+	return nil
 }
 
-func (m *IDCookieManager) Delete(w http.ResponseWriter, r *http.Request) error {
+func (m *IDCookieManager) Delete(w http.ResponseWriter) error {
 	c := &http.Cookie{
 		Name:   m.sessionIDKey,
 		Value:  "",
@@ -108,13 +113,4 @@ func (m *IDCookieManager) Delete(w http.ResponseWriter, r *http.Request) error {
 	}
 	http.SetCookie(w, c)
 	return nil
-}
-
-func (m *IDCookieManager) issueSessionID() (string, error) {
-	buf := make([]byte, 16)
-	_, err := rand.Read(buf)
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(buf), nil
 }

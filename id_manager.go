@@ -3,6 +3,8 @@ package session
 import "net/http"
 
 type IDManager interface {
-	GetOrIssue(w http.ResponseWriter, r *http.Request) (string, error)
-	Delete(w http.ResponseWriter, r *http.Request) error
+	Get(r *http.Request) (string, error)
+	Issue() (string, error)
+	Write(w http.ResponseWriter, sessID string) error
+	Delete(w http.ResponseWriter) error
 }
