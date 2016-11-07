@@ -153,11 +153,11 @@ func newRedisPool(address string, c *redisStoreConfig) *redis.Pool {
 	}
 }
 
-func (s *redisStore) Get(ctx context.Context, id, key string, valuePtr interface{}) error {
+func (s *redisStore) Load(ctx context.Context, id string, valuePtr interface{}) error {
 	conn := s.pool.Get()
 	defer conn.Close()
 
-	reply, err := conn.Do("HGET", s.formatIDKey(id), key)
+	reply, err := conn.Do("GET", s.formatIDKey(id))
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func (s *redisStore) Get(ctx context.Context, id, key string, valuePtr interface
 	return nil
 }
 
-func (s *redisStore) Set(ctx context.Context, id, key string, value interface{}) error {
+func (s *redisStore) Save(ctx context.Context, id string, value interface{}) error {
 	conn := s.pool.Get()
 	defer conn.Close()
 
@@ -185,7 +185,7 @@ func (s *redisStore) Set(ctx context.Context, id, key string, value interface{})
 	if err != nil {
 		return err
 	}
-	_, err = conn.Do("HSET", s.formatIDKey(id), key, v)
+	_, err = conn.Do("SET", s.formatIDKey(id), v)
 	if err != nil {
 		return err
 	}
@@ -195,21 +195,7 @@ func (s *redisStore) Set(ctx context.Context, id, key string, value interface{})
 	return nil
 }
 
-func (s *redisStore) Remove(ctx context.Context, id, key string) error {
-	conn := s.pool.Get()
-	defer conn.Close()
-
-	_, err := conn.Do("HDEL", s.formatIDKey(id), key)
-	if err != nil {
-		return err
-	}
-	if s.autoExpire > 0 {
-		return s.Expire(ctx, id, s.autoExpire)
-	}
-	return nil
-}
-
-func (s *redisStore) RemoveAll(ctx context.Context, id string) error {
+func (s *redisStore) Delete(ctx context.Context, id string) error {
 	conn := s.pool.Get()
 	defer conn.Close()
 
