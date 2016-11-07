@@ -164,9 +164,6 @@ func (s *RedisStore) Load(ctx context.Context, id string, valuePtr interface{}) 
 	if reply == nil {
 		return ErrNotFound
 	}
-	if valuePtr == nil {
-		return nil
-	}
 	err = s.decodeValue(reply.([]byte), valuePtr)
 	if err != nil {
 		return err
