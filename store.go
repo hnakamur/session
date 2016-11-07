@@ -13,6 +13,4 @@ type Store interface {
 	Save(ctx context.Context, id string, value interface{}) error
 	Delete(ctx context.Context, id string) error
 	Expire(ctx context.Context, id string, d time.Duration) error
-
-	Close() error
 }

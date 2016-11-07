@@ -8,7 +8,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 )
 
-type redisStore struct {
+type RedisStore struct {
 	pool        *redis.Pool
 	autoExpire  time.Duration
 	formatIDKey func(id string) string
@@ -16,7 +16,7 @@ type redisStore struct {
 	decodeValue func(data []byte, valuePtr interface{}) error
 }
 
-func NewRedisStore(address string, options ...RedisStoreOption) (Store, error) {
+func NewRedisStore(address string, options ...RedisStoreOption) (*RedisStore, error) {
 	c := defaultRedisStoreConfig()
 	for _, o := range options {
 		err := o(c)
@@ -25,7 +25,7 @@ func NewRedisStore(address string, options ...RedisStoreOption) (Store, error) {
 		}
 	}
 
-	return &redisStore{
+	return &RedisStore{
 		pool:        newRedisPool(address, c),
 		autoExpire:  c.autoExpire,
 		formatIDKey: c.formatIDKey,
@@ -153,7 +153,7 @@ func newRedisPool(address string, c *redisStoreConfig) *redis.Pool {
 	}
 }
 
-func (s *redisStore) Load(ctx context.Context, id string, valuePtr interface{}) error {
+func (s *RedisStore) Load(ctx context.Context, id string, valuePtr interface{}) error {
 	conn := s.pool.Get()
 	defer conn.Close()
 
@@ -177,7 +177,7 @@ func (s *redisStore) Load(ctx context.Context, id string, valuePtr interface{}) 
 	return nil
 }
 
-func (s *redisStore) Save(ctx context.Context, id string, value interface{}) error {
+func (s *RedisStore) Save(ctx context.Context, id string, value interface{}) error {
 	conn := s.pool.Get()
 	defer conn.Close()
 
@@ -195,7 +195,7 @@ func (s *redisStore) Save(ctx context.Context, id string, value interface{}) err
 	return nil
 }
 
-func (s *redisStore) Delete(ctx context.Context, id string) error {
+func (s *RedisStore) Delete(ctx context.Context, id string) error {
 	conn := s.pool.Get()
 	defer conn.Close()
 
@@ -203,7 +203,7 @@ func (s *redisStore) Delete(ctx context.Context, id string) error {
 	return err
 }
 
-func (s *redisStore) Expire(ctx context.Context, id string, d time.Duration) error {
+func (s *RedisStore) Expire(ctx context.Context, id string, d time.Duration) error {
 	conn := s.pool.Get()
 	defer conn.Close()
 
@@ -211,6 +211,6 @@ func (s *redisStore) Expire(ctx context.Context, id string, d time.Duration) err
 	return err
 }
 
-func (s *redisStore) Close() error {
+func (s *RedisStore) Close() error {
 	return s.pool.Close()
 }
