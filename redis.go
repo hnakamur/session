@@ -168,6 +168,7 @@ func newRedisPool(address string, c *redisStoreConfig) *redis.Pool {
 			if err != nil {
 				return errors.WithStack(err)
 			}
+			return nil
 		},
 	}
 }

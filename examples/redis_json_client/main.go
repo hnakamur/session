@@ -15,7 +15,7 @@ type mySession struct {
 func main() {
 	store, err := session.NewRedisStore(":6379",
 		session.SetRedisPoolMaxIdle(2),
-		session.SetAutoExpire(time.Second))
+		session.SetExpiration(time.Second))
 	if err != nil {
 		log.Fatal(err)
 	}
