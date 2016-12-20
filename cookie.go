@@ -97,8 +97,8 @@ func SetSecure(secure bool) IDCookieManagerOption {
 	}
 }
 
-// SethTTPOnly sets the HttpOnly in the cookie.
-func SethTTPOnly(httpOnly bool) IDCookieManagerOption {
+// SetHTTPOnly sets the HttpOnly in the cookie.
+func SetHTTPOnly(httpOnly bool) IDCookieManagerOption {
 	return func(m *IDCookieManager) error {
 		m.httpOnly = httpOnly
 		return nil
